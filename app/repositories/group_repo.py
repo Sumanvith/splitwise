@@ -1,42 +1,43 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.group import Group, GroupMember
 from app.models.user import User
 
 
-def create(db: Session, name: str, created_by: int) -> Group:
+async def create(db: AsyncSession, name: str, created_by: int) -> Group:
     group = Group(name=name, created_by=created_by)
     db.add(group)
-    db.flush()
+    await db.flush()
     return group
 
 
-def get_by_id(db: Session, group_id: int) -> Group | None:
-    return db.get(Group, group_id)
+async def get_by_id(db: AsyncSession, group_id: int) -> Group | None:
+    return await db.get(Group, group_id)
 
 
-def list_for_user(db: Session, user_id: int) -> list[Group]:
+async def list_for_user(db: AsyncSession, user_id: int) -> list[Group]:
     stmt = (
         select(Group)
         .join(GroupMember, GroupMember.group_id == Group.id)
         .where(GroupMember.user_id == user_id)
         .order_by(Group.created_at.desc())
     )
-    return list(db.scalars(stmt).all())
+    result = await db.scalars(stmt)
+    return list(result.all())
 
 
-def get_member(db: Session, group_id: int, user_id: int) -> GroupMember | None:
-    return db.get(GroupMember, (group_id, user_id))
+async def get_member(db: AsyncSession, group_id: int, user_id: int) -> GroupMember | None:
+    return await db.get(GroupMember, (group_id, user_id))
 
 
-def add_member(db: Session, group_id: int, user_id: int) -> GroupMember:
+async def add_member(db: AsyncSession, group_id: int, user_id: int) -> GroupMember:
     member = GroupMember(group_id=group_id, user_id=user_id)
     db.add(member)
-    db.flush()
+    await db.flush()
     return member
 
 
-def list_members(db: Session, group_id: int):
+async def list_members(db: AsyncSession, group_id: int):
     stmt = (
         select(
             User.id.label('user_id'),
@@ -48,4 +49,5 @@ def list_members(db: Session, group_id: int):
         .where(GroupMember.group_id == group_id)
         .order_by(GroupMember.joined_at)
     )
-    return db.execute(stmt).all()
+    result = await db.execute(stmt)
+    return result.all()
