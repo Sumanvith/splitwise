@@ -1,7 +1,18 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import ValidationException
+from app.models.settlement import Settlement
 from app.repositories import group_repo, settlement_repo
-from app.schemas.settlement import BalanceRead, SuggestedSettlement, UserBalance
+from app.schemas.settlement import (
+    BalanceRead,
+    SettlementCreate,
+    SuggestedSettlement,
+    UserBalance,
+)
+
+
+def _to_paise(amount: float) -> int:
+    return round(amount * 100)
 
 
 def _suggest_settlements(nets: dict[int, int]) -> list[SuggestedSettlement]:
@@ -40,12 +51,43 @@ async def get_balances(db: AsyncSession, group_id: int) -> BalanceRead:
     members = await group_repo.list_members(db, group_id)
     paid = await settlement_repo.get_paid_totals(db, group_id)
     owed = await settlement_repo.get_owed_totals(db, group_id)
+    sent = await settlement_repo.get_sent_totals(db, group_id)
+    received = await settlement_repo.get_received_totals(db, group_id)
 
     nets = {
-        m.user_id: paid.get(m.user_id, 0) - owed.get(m.user_id, 0) for m in members
+        m.user_id: (
+            paid.get(m.user_id, 0)
+            - owed.get(m.user_id, 0)
+            + sent.get(m.user_id, 0)
+            - received.get(m.user_id, 0)
+        )
+        for m in members
     }
     return BalanceRead(
         balances=[UserBalance(user_id=uid, net_amount=n)
                   for uid, n in nets.items()],
         suggested_settlements=_suggest_settlements(nets),
     )
+
+
+async def create_settlement(
+    db: AsyncSession, group_id: int, data: SettlementCreate
+) -> Settlement:
+    members = await group_repo.list_members(db, group_id)
+    member_ids = {m.user_id for m in members}
+    if not ({data.from_user, data.to_user} <= member_ids):
+        raise ValidationException("Both users must be group members")
+
+    settlement = Settlement(
+        group_id=group_id,
+        from_user=data.from_user,
+        to_user=data.to_user,
+        amount=_to_paise(data.amount),
+    )
+    await settlement_repo.create(db, settlement)
+    await db.commit()
+    return settlement
+
+
+async def list_settlements(db: AsyncSession, group_id: int) -> list[Settlement]:
+    return await settlement_repo.list_by_group(db, group_id)
