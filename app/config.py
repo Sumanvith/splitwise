@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     project_name: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    redis_url: str
 
 
 settings = Settings()

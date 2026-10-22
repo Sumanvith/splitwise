@@ -1,5 +1,6 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.cache import balances_key, cache_delete, cache_get, cache_set
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import ValidationException
 from app.models.settlement import Settlement
 from app.repositories import group_repo, settlement_repo
@@ -48,6 +49,12 @@ def _suggest_settlements(nets: dict[int, int]) -> list[SuggestedSettlement]:
 
 
 async def get_balances(db: AsyncSession, group_id: int) -> BalanceRead:
+    key = balances_key(group_id)
+    cached = await cache_get(key)
+    print(key, cached)
+    if cached is not None:
+        return BalanceRead.model_validate(cached)
+
     members = await group_repo.list_members(db, group_id)
     paid = await settlement_repo.get_paid_totals(db, group_id)
     owed = await settlement_repo.get_owed_totals(db, group_id)
@@ -63,11 +70,13 @@ async def get_balances(db: AsyncSession, group_id: int) -> BalanceRead:
         )
         for m in members
     }
-    return BalanceRead(
+    result = BalanceRead(
         balances=[UserBalance(user_id=uid, net_amount=n)
                   for uid, n in nets.items()],
         suggested_settlements=_suggest_settlements(nets),
     )
+    await cache_set(key, result.model_dump(mode="json"))
+    return result
 
 
 async def create_settlement(
@@ -86,6 +95,7 @@ async def create_settlement(
     )
     await settlement_repo.create(db, settlement)
     await db.commit()
+    await cache_delete(balances_key(group_id))
     return settlement
 
 

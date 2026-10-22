@@ -1,5 +1,6 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.cache import balances_key, cache_delete
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import NotFoundException, ValidationException
 from app.models.expense import Expense, ExpenseShare
 from app.repositories import expense_repo, group_repo
@@ -63,6 +64,7 @@ async def create_expense(
     ]
     await expense_repo.create(db, expense, shares)
     await db.commit()
+    await cache_delete(balances_key(group_id))
     return _to_read(expense, shares)
 
 

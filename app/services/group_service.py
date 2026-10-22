@@ -1,3 +1,5 @@
+from app.core.cache import balances_key, cache_delete
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import ConflictException, NotFoundException
 from app.models.group import Group, GroupMember
@@ -27,6 +29,7 @@ async def add_member(db: AsyncSession, group_id: int, email: str) -> GroupMember
 
     member = await group_repo.add_member(db, group_id, user.id)
     await db.commit()
+    await cache_delete(balances_key(group_id))
     return member
 
 
