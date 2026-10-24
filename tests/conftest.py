@@ -5,11 +5,25 @@ from sqlalchemy.pool import NullPool
 
 from app.main import app
 from app.config import settings
-from app.database import Base, get_db  # GUESS: Base and get_db live in app/database.py
+# GUESS: Base and get_db live in app/database.py
+from app.database import Base, get_db
 from app.models import user, group, expense, settlement  # noqa: F401  (register tables on Base.metadata)
+
+import fakeredis.aioredis
+import pytest_asyncio
+from app.core import cache
 
 # GUESS: settings.DATABASE_URL is the asyncpg URL ending in /<dbname>
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/splitwise_test"
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def fake_redis(monkeypatch):
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr(cache, "redis_client", fake)
+    yield fake
+    await fake.flushall()
+    await fake.aclose()
 
 
 @pytest.fixture
