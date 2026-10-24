@@ -15,6 +15,10 @@ class Group(Base):
 class GroupMember(Base):
     __tablename__ = 'group_members'
 
-    group_id = Column(Integer, ForeignKey('groups.id'), primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    group_id = Column(
+        Integer, ForeignKey('groups.id', ondelete='CASCADE'), primary_key=True
+    )
+    user_id = Column(
+        Integer, ForeignKey('users.id'), primary_key=True, index=True
+    )
     joined_at = Column(DateTime, default=datetime.now)

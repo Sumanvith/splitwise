@@ -30,5 +30,6 @@ htmlcov/
 Thumbs.db
 
 # Logs and local data
+logs/
 *.log
 *.sqlite3

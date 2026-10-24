@@ -16,6 +16,13 @@ def balances_key(group_id: int) -> str:
     return f"balances:{group_id}"
 
 
+async def cache_ping() -> bool:
+    try:
+        return bool(await redis_client.ping())
+    except Exception:
+        return False
+
+
 async def cache_get(key: str):
     try:
         value = await redis_client.get(key)

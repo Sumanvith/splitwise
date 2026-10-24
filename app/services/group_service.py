@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import ConflictException, NotFoundException
 from app.models.group import Group, GroupMember
 from app.repositories import group_repo, user_repo
+from sqlalchemy.exc import IntegrityError
 
 
 async def create_group(db: AsyncSession, name: str, user_id: int) -> Group:
@@ -27,8 +28,13 @@ async def add_member(db: AsyncSession, group_id: int, email: str) -> GroupMember
     if existing_member:
         raise ConflictException('User is already in this group')
 
-    member = await group_repo.add_member(db, group_id, user.id)
-    await db.commit()
+    try:
+        member = await group_repo.add_member(db, group_id, user.id)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()  # lost the race, the DB primary key caught it
+        raise ConflictException('User is already in this group')
+
     await cache_delete(balances_key(group_id))
     return member
 

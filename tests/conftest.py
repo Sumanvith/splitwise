@@ -13,8 +13,15 @@ import fakeredis.aioredis
 import pytest_asyncio
 from app.core import cache
 
+from app.core.limiter import limiter
+
 # GUESS: settings.DATABASE_URL is the asyncpg URL ending in /<dbname>
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/splitwise_test"
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limit(monkeypatch):
+    monkeypatch.setattr(limiter, "enabled", False)
 
 
 @pytest_asyncio.fixture(autouse=True)
